@@ -1,54 +1,96 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import Canvas from "./components/Canvas";
 import Toolbar from "./components/Toolbar";
-
+import StatusBar from "./components/StatusBar"; 
+import useWebSocket from "./hooks/useWebSocket";
+import './App.css';
+import { Toaster } from 'sonner';
 
 const App = () => {
-  const [socket, setSocket] = useState(null);
   const [brushColor, setBrushColor] = useState("#000000");
   const [brushSize, setBrushSize] = useState(5);
+  const [brushStyle, setBrushStyle] = useState("solid");
+  const [currentShape, setCurrentShape] = useState("freehand");
+  const [drawnShapes, setDrawnShapes] = useState([]);
+  
+  const { socket, connectionStatus, connectedUsers } = useWebSocket();
+  const canvasRef = useRef(null);
 
-  useEffect(() => {
-    const wsURL = process.env.REACT_APP_WEBSOCKET_URL
-    if (!wsURL) {
-      console.error("WebSocket URL is not defined in the .env file");
-      return;
+  const handleClear = () => {
+    if (canvasRef.current) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      setDrawnShapes([]);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (socket) {
+        socket.send(
+          JSON.stringify({
+            type: 'clear',
+          })
+        );
+      }
     }
-    const ws = new WebSocket(wsURL);
+  };
 
-    ws.onopen = () => console.log("WebSocket connected");
-    ws.onclose = () => console.log("WebSocket disconnected");
-    ws.onerror = (error) => console.error("WebSocket error:", error);
+  const handleDownload = () => {
+    if (canvasRef.current) {
+      const canvas = canvasRef.current;
+      const dataURL = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = dataURL;
+      a.download = `canvas-drawing-${Date.now()}.png`;
+      a.click();
+    }
+  };
 
-    setSocket(ws);
+  if (connectionStatus === 'connecting') {
+    return (
+      <div className="connection-status">
+        <div className="status-message">Connecting to server...</div>
+      </div>
+    );
+  }
 
-    return () => {
-      console.log("Cleaning up WebSocket connection");
-      ws.onclose = null;
-      ws.onmessage = null;
-      ws.close();
-    };
-  }, []);
-
-  if (!socket) {
-    return <div>Connecting to server...</div>; // Placeholder while socket initializes
+  if (connectionStatus === 'disconnected') {
+    return (
+      <div className="connection-status">
+        <div className="status-message">
+          Disconnected from server... 
+          {`Attempting to reconnect (${socket ? socket.reconnectAttempts : 0}/5)`}
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div>
+    <div className="app-container">
+      <Toaster />
+      <StatusBar 
+        connectionStatus={connectionStatus} 
+        connectedUsers={connectedUsers} 
+      />
       <Toolbar
         setBrushColor={setBrushColor}
         setBrushSize={setBrushSize}
+        setBrushStyle={setBrushStyle}
+        setCurrentShape={setCurrentShape}
         socket={socket}
         brushColor={brushColor}
         brushSize={brushSize}
+        brushStyle={brushStyle}
+        currentShape={currentShape}
+        onClear={handleClear}
+        onDownload={handleDownload}
       />
       <Canvas
+        ref={canvasRef}
         socket={socket}
         brushColor={brushColor}
         brushSize={brushSize}
-        setBrushColor={setBrushColor}
-        setBrushSize={setBrushSize}
+        brushStyle={brushStyle}
+        currentShape={currentShape}
+        drawnShapes={drawnShapes}
+        setDrawnShapes={setDrawnShapes}
       />
     </div>
   );
