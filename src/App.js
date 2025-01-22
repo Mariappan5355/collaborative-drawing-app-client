@@ -3,8 +3,23 @@ import Canvas from "./components/Canvas";
 import Toolbar from "./components/Toolbar";
 import StatusBar from "./components/StatusBar"; 
 import useWebSocket from "./hooks/useWebSocket";
+import { Toaster, toast } from 'sonner';
 import './App.css';
-import { Toaster } from 'sonner';
+
+const Loader = () => (
+  <div className="loader-container">
+    <div className="rotating-cube">
+      <div className="cube cube1"></div>
+      <div className="cube cube2"></div>
+      <div className="cube cube3"></div>
+      <div className="cube cube4"></div>
+    </div>
+    <p className="loader-text">Connecting to server, please wait...</p>
+  </div>
+);
+
+
+
 
 const App = () => {
   const [brushColor, setBrushColor] = useState("#000000");
@@ -23,11 +38,8 @@ const App = () => {
       setDrawnShapes([]);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (socket) {
-        socket.send(
-          JSON.stringify({
-            type: 'clear',
-          })
-        );
+        socket.send(JSON.stringify({ type: 'clear' }));
+        toast.success('Canvas cleared');
       }
     }
   };
@@ -40,23 +52,24 @@ const App = () => {
       a.href = dataURL;
       a.download = `canvas-drawing-${Date.now()}.png`;
       a.click();
+      toast.success('Drawing downloaded successfully');
     }
   };
 
   if (connectionStatus === 'connecting') {
-    return (
-      <div className="connection-status">
-        <div className="status-message">Connecting to server...</div>
-      </div>
-    );
+    return <Loader />;
   }
 
   if (connectionStatus === 'disconnected') {
     return (
-      <div className="connection-status">
-        <div className="status-message">
-          Disconnected from server... 
-          {`Attempting to reconnect (${socket ? socket.reconnectAttempts : 0}/5)`}
+      <div className="flex items-center justify-center min-h-screen bg-white">
+        <div className="text-center p-6 bg-red-50 rounded-lg">
+          <p className="text-lg text-red-600 font-medium">
+            Disconnected from server...
+          </p>
+          <p className="text-sm text-red-500 mt-2">
+            Attempting to reconnect ({socket ? socket.reconnectAttempts : 0}/5)
+          </p>
         </div>
       </div>
     );
@@ -64,7 +77,12 @@ const App = () => {
 
   return (
     <div className="app-container">
-      <Toaster />
+      <Toaster 
+        position="top-right"
+        expand
+        richColors
+        closeButton
+      />
       <StatusBar 
         connectionStatus={connectionStatus} 
         connectedUsers={connectedUsers} 
